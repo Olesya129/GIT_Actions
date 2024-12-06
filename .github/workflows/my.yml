@@ -1,0 +1,58 @@
+name: Test CI/CD Workflow
+on:
+  push:
+    branches: [main]  # Триггер: запуск при пуше в ветку main
+
+jobs:
+  test-and-package:  # Первый job: тестирование и упаковка
+    runs-on: ubuntu-latest
+    env:
+      # Переменные окружения для путей к отчетам
+      COVERAGE_XML_REPORT_PATH: /tmp/coverage_xml_report.xml
+      PYTEST_REPORT_PATH: /tmp/pytest_report.html
+
+    steps:
+      # Склонировать репозиторий
+      - name: "Checkout repository"
+        uses: actions/checkout@v3
+
+      # Установить Python
+      - name: "Install Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11.9'  # Версия Python
+          architecture: 'x64'  # Архитектура (x64)
+
+      # Установить зависимости проекта
+      - name: "Install project dependencies"
+        run: pip install -r requirements.txt
+
+      # Запустить тесты и анализ покрытия кода
+      - name: "Run tests and generate report"
+        run: python -m pytest --html=${{ env.PYTEST_REPORT_PATH }} --self-contained-html
+
+      # Архивировать отчеты pytest
+      - name: "Archive pytest reports"
+        uses: actions/upload-artifact@v3
+        if: ${{!cancelled()}}  # Выполнить только если job не отменён
+        with:
+          name: "Test and reports"  # Имя архива
+          path: |
+            ${{ env.PYTEST_REPORT_PATH }}
+
+  publish-package-as-artifact:  # Второй job: публикация артефакта
+    needs: ["test-and-package"]  # Зависит от успешного выполнения первого job
+    runs-on: ubuntu-latest
+
+    steps:
+      # Склонировать репозиторий
+      - name: "Checkout repository"
+        uses: actions/checkout@v3
+
+      # Публиковать артефакт пакета
+      - name: "Publish package as artifact"
+        uses: actions/upload-artifact@v3
+        with:
+          name: "Built package"  # Имя артефакта
+          path: "src"  # Путь к исходному коду
+
